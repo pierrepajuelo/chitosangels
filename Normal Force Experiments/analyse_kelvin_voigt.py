@@ -13,6 +13,7 @@ import matplotlib as mpl
 import os
 from scipy.optimize import curve_fit
 from tqdm import tqdm
+from chisquare_old_version import * # Be sure that your working folder is the right one
 
 # Definition of functions
 def data_format(data):
@@ -67,314 +68,17 @@ def data_format_bis(data):
 
 def gaussian(t,tau,a):
     return(a*(np.exp(-(t-t[0])/tau)+1))
-###
-from collections import namedtuple
-import numpy as np
-from scipy import stats, special
-
-
-def chisquare(f_obs, f_exp=None, ddof=0, axis=0):
-    """
-    Calculate a one-way chi-square test.
-    The chi-square test tests the null hypothesis that the categorical data
-    has the given frequencies.
-    Parameters
-    ----------
-    f_obs : array_like
-        Observed frequencies in each category.
-    f_exp : array_like, optional
-        Expected frequencies in each category.  By default the categories are
-        assumed to be equally likely.
-    ddof : int, optional
-        "Delta degrees of freedom": adjustment to the degrees of freedom
-        for the p-value.  The p-value is computed using a chi-squared
-        distribution with ``k - 1 - ddof`` degrees of freedom, where `k`
-        is the number of observed frequencies.  The default value of `ddof`
-        is 0.
-    axis : int or None, optional
-        The axis of the broadcast result of `f_obs` and `f_exp` along which to
-        apply the test.  If axis is None, all values in `f_obs` are treated
-        as a single data set.  Default is 0.
-    Returns
-    -------
-    chisq : float or ndarray
-        The chi-squared test statistic.  The value is a float if `axis` is
-        None or `f_obs` and `f_exp` are 1-D.
-    p : float or ndarray
-        The p-value of the test.  The value is a float if `ddof` and the
-        return value `chisq` are scalars.
-    See Also
-    --------
-    scipy.stats.power_divergence
-    Notes
-    -----
-    This test is invalid when the observed or expected frequencies in each
-    category are too small.  A typical rule is that all of the observed
-    and expected frequencies should be at least 5.
-    The default degrees of freedom, k-1, are for the case when no parameters
-    of the distribution are estimated. If p parameters are estimated by
-    efficient maximum likelihood then the correct degrees of freedom are
-    k-1-p. If the parameters are estimated in a different way, then the
-    dof can be between k-1-p and k-1. However, it is also possible that
-    the asymptotic distribution is not chi-square, in which case this test
-    is not appropriate.
-    References
-    ----------
-    .. [1] Lowry, Richard.  "Concepts and Applications of Inferential
-           Statistics". Chapter 8.
-           https://web.archive.org/web/20171022032306/http://vassarstats.net:80/textbook/ch8pt1.html
-    .. [2] "Chi-squared test", https://en.wikipedia.org/wiki/Chi-squared_test
-    Examples
-    --------
-    When just `f_obs` is given, it is assumed that the expected frequencies
-    are uniform and given by the mean of the observed frequencies.
-    >>> from scipy.stats import chisquare
-    >>> chisquare([16, 18, 16, 14, 12, 12])
-    (2.0, 0.84914503608460956)
-    With `f_exp` the expected frequencies can be given.
-    >>> chisquare([16, 18, 16, 14, 12, 12], f_exp=[16, 16, 16, 16, 16, 8])
-    (3.5, 0.62338762774958223)
-    When `f_obs` is 2-D, by default the test is applied to each column.
-    >>> obs = np.array([[16, 18, 16, 14, 12, 12], [32, 24, 16, 28, 20, 24]]).T
-    >>> obs.shape
-    (6, 2)
-    >>> chisquare(obs)
-    (array([ 2.        ,  6.66666667]), array([ 0.84914504,  0.24663415]))
-    By setting ``axis=None``, the test is applied to all data in the array,
-    which is equivalent to applying the test to the flattened array.
-    >>> chisquare(obs, axis=None)
-    (23.31034482758621, 0.015975692534127565)
-    >>> chisquare(obs.ravel())
-    (23.31034482758621, 0.015975692534127565)
-    `ddof` is the change to make to the default degrees of freedom.
-    >>> chisquare([16, 18, 16, 14, 12, 12], ddof=1)
-    (2.0, 0.73575888234288467)
-    The calculation of the p-values is done by broadcasting the
-    chi-squared statistic with `ddof`.
-    >>> chisquare([16, 18, 16, 14, 12, 12], ddof=[0,1,2])
-    (2.0, array([ 0.84914504,  0.73575888,  0.5724067 ]))
-    `f_obs` and `f_exp` are also broadcast.  In the following, `f_obs` has
-    shape (6,) and `f_exp` has shape (2, 6), so the result of broadcasting
-    `f_obs` and `f_exp` has shape (2, 6).  To compute the desired chi-squared
-    statistics, we use ``axis=1``:
-    >>> chisquare([16, 18, 16, 14, 12, 12],
-    ...           f_exp=[[16, 16, 16, 16, 16, 8], [8, 20, 20, 16, 12, 12]],
-    ...           axis=1)
-    (array([ 3.5 ,  9.25]), array([ 0.62338763,  0.09949846]))
-    """
-    return power_divergence(f_obs, f_exp=f_exp, ddof=ddof, axis=axis,
-                            lambda_="pearson")
-
-
-# Map from names to lambda_ values used in power_divergence().
-_power_div_lambda_names = {
-    "pearson": 1,
-    "log-likelihood": 0,
-    "freeman-tukey": -0.5,
-    "mod-log-likelihood": -1,
-    "neyman": -2,
-    "cressie-read": 2/3,
-}
-
-
-def _count(a, axis=None):
-    """
-    Count the number of non-masked elements of an array.
-    This function behaves like np.ma.count(), but is much faster
-    for ndarrays.
-    """
-    if hasattr(a, 'count'):
-        num = a.count(axis=axis)
-        if isinstance(num, np.ndarray) and num.ndim == 0:
-            # In some cases, the `count` method returns a scalar array (e.g.
-            # np.array(3)), but we want a plain integer.
-            num = int(num)
-    else:
-        if axis is None:
-            num = a.size
-        else:
-            num = a.shape[axis]
-    return num
-
-
-Power_divergenceResult = namedtuple('Power_divergenceResult',
-                                    ('statistic', 'pvalue'))
-
-
-def power_divergence(f_obs, f_exp=None, ddof=0, axis=0, lambda_=None):
-    """
-    Cressie-Read power divergence statistic and goodness of fit test.
-    This function tests the null hypothesis that the categorical data
-    has the given frequencies, using the Cressie-Read power divergence
-    statistic.
-    Parameters
-    ----------
-    f_obs : array_like
-        Observed frequencies in each category.
-    f_exp : array_like, optional
-        Expected frequencies in each category.  By default the categories are
-        assumed to be equally likely.
-    ddof : int, optional
-        "Delta degrees of freedom": adjustment to the degrees of freedom
-        for the p-value.  The p-value is computed using a chi-squared
-        distribution with ``k - 1 - ddof`` degrees of freedom, where `k`
-        is the number of observed frequencies.  The default value of `ddof`
-        is 0.
-    axis : int or None, optional
-        The axis of the broadcast result of `f_obs` and `f_exp` along which to
-        apply the test.  If axis is None, all values in `f_obs` are treated
-        as a single data set.  Default is 0.
-    lambda_ : float or str, optional
-        The power in the Cressie-Read power divergence statistic.  The default
-        is 1.  For convenience, `lambda_` may be assigned one of the following
-        strings, in which case the corresponding numerical value is used::
-            String              Value   Description
-            "pearson"             1     Pearson's chi-squared statistic.
-                                        In this case, the function is
-                                        equivalent to `stats.chisquare`.
-            "log-likelihood"      0     Log-likelihood ratio. Also known as
-                                        the G-test [3]_.
-            "freeman-tukey"      -1/2   Freeman-Tukey statistic.
-            "mod-log-likelihood" -1     Modified log-likelihood ratio.
-            "neyman"             -2     Neyman's statistic.
-            "cressie-read"        2/3   The power recommended in [5]_.
-    Returns
-    -------
-    statistic : float or ndarray
-        The Cressie-Read power divergence test statistic.  The value is
-        a float if `axis` is None or if` `f_obs` and `f_exp` are 1-D.
-    pvalue : float or ndarray
-        The p-value of the test.  The value is a float if `ddof` and the
-        return value `stat` are scalars.
-    See Also
-    --------
-    chisquare
-    Notes
-    -----
-    This test is invalid when the observed or expected frequencies in each
-    category are too small.  A typical rule is that all of the observed
-    and expected frequencies should be at least 5.
-    When `lambda_` is less than zero, the formula for the statistic involves
-    dividing by `f_obs`, so a warning or error may be generated if any value
-    in `f_obs` is 0.
-    Similarly, a warning or error may be generated if any value in `f_exp` is
-    zero when `lambda_` >= 0.
-    The default degrees of freedom, k-1, are for the case when no parameters
-    of the distribution are estimated. If p parameters are estimated by
-    efficient maximum likelihood then the correct degrees of freedom are
-    k-1-p. If the parameters are estimated in a different way, then the
-    dof can be between k-1-p and k-1. However, it is also possible that
-    the asymptotic distribution is not a chisquare, in which case this
-    test is not appropriate.
-    This function handles masked arrays.  If an element of `f_obs` or `f_exp`
-    is masked, then data at that position is ignored, and does not count
-    towards the size of the data set.
-    .. versionadded:: 0.13.0
-    References
-    ----------
-    .. [1] Lowry, Richard.  "Concepts and Applications of Inferential
-           Statistics". Chapter 8.
-           https://web.archive.org/web/20171015035606/http://faculty.vassar.edu/lowry/ch8pt1.html
-    .. [2] "Chi-squared test", https://en.wikipedia.org/wiki/Chi-squared_test
-    .. [3] "G-test", https://en.wikipedia.org/wiki/G-test
-    .. [4] Sokal, R. R. and Rohlf, F. J. "Biometry: the principles and
-           practice of statistics in biological research", New York: Freeman
-           (1981)
-    .. [5] Cressie, N. and Read, T. R. C., "Multinomial Goodness-of-Fit
-           Tests", J. Royal Stat. Soc. Series B, Vol. 46, No. 3 (1984),
-           pp. 440-464.
-    Examples
-    --------
-    (See `chisquare` for more examples.)
-    When just `f_obs` is given, it is assumed that the expected frequencies
-    are uniform and given by the mean of the observed frequencies.  Here we
-    perform a G-test (i.e. use the log-likelihood ratio statistic):
-    >>> from scipy.stats import power_divergence
-    >>> power_divergence([16, 18, 16, 14, 12, 12], lambda_='log-likelihood')
-    (2.006573162632538, 0.84823476779463769)
-    The expected frequencies can be given with the `f_exp` argument:
-    >>> power_divergence([16, 18, 16, 14, 12, 12],
-    ...                  f_exp=[16, 16, 16, 16, 16, 8],
-    ...                  lambda_='log-likelihood')
-    (3.3281031458963746, 0.6495419288047497)
-    When `f_obs` is 2-D, by default the test is applied to each column.
-    >>> obs = np.array([[16, 18, 16, 14, 12, 12], [32, 24, 16, 28, 20, 24]]).T
-    >>> obs.shape
-    (6, 2)
-    >>> power_divergence(obs, lambda_="log-likelihood")
-    (array([ 2.00657316,  6.77634498]), array([ 0.84823477,  0.23781225]))
-    By setting ``axis=None``, the test is applied to all data in the array,
-    which is equivalent to applying the test to the flattened array.
-    >>> power_divergence(obs, axis=None)
-    (23.31034482758621, 0.015975692534127565)
-    >>> power_divergence(obs.ravel())
-    (23.31034482758621, 0.015975692534127565)
-    `ddof` is the change to make to the default degrees of freedom.
-    >>> power_divergence([16, 18, 16, 14, 12, 12], ddof=1)
-    (2.0, 0.73575888234288467)
-    The calculation of the p-values is done by broadcasting the
-    test statistic with `ddof`.
-    >>> power_divergence([16, 18, 16, 14, 12, 12], ddof=[0,1,2])
-    (2.0, array([ 0.84914504,  0.73575888,  0.5724067 ]))
-    `f_obs` and `f_exp` are also broadcast.  In the following, `f_obs` has
-    shape (6,) and `f_exp` has shape (2, 6), so the result of broadcasting
-    `f_obs` and `f_exp` has shape (2, 6).  To compute the desired chi-squared
-    statistics, we must use ``axis=1``:
-    >>> power_divergence([16, 18, 16, 14, 12, 12],
-    ...                  f_exp=[[16, 16, 16, 16, 16, 8],
-    ...                         [8, 20, 20, 16, 12, 12]],
-    ...                  axis=1)
-    (array([ 3.5 ,  9.25]), array([ 0.62338763,  0.09949846]))
-    """
-    # Convert the input argument `lambda_` to a numerical value.
-    if isinstance(lambda_, str):
-        if lambda_ not in _power_div_lambda_names:
-            names = repr(list(_power_div_lambda_names.keys()))[1:-1]
-            raise ValueError("invalid string for lambda_: {0!r}.  Valid strings "
-                             "are {1}".format(lambda_, names))
-        lambda_ = _power_div_lambda_names[lambda_]
-    elif lambda_ is None:
-        lambda_ = 1
-
-    f_obs = np.asanyarray(f_obs)
-
-    if f_exp is not None:
-        f_exp = np.asanyarray(f_exp)
-    else:
-        # Ignore 'invalid' errors so the edge case of a data set with length 0
-        # is handled without spurious warnings.
-        with np.errstate(invalid='ignore'):
-            f_exp = f_obs.mean(axis=axis, keepdims=True)
-
-    # `terms` is the array of terms that are summed along `axis` to create
-    # the test statistic.  We use some specialized code for a few special
-    # cases of lambda_.
-    if lambda_ == 1:
-        # Pearson's chi-squared statistic
-        terms = (f_obs.astype(np.float64) - f_exp)**2 / f_exp
-    elif lambda_ == 0:
-        # Log-likelihood ratio (i.e. G-test)
-        terms = 2.0 * special.xlogy(f_obs, f_obs / f_exp)
-    elif lambda_ == -1:
-        # Modified log-likelihood ratio
-        terms = 2.0 * special.xlogy(f_exp, f_exp / f_obs)
-    else:
-        # General Cressie-Read power divergence.
-        terms = f_obs * ((f_obs / f_exp)**lambda_ - 1)
-        terms /= 0.5 * lambda_ * (lambda_ + 1)
-
-    stat = terms.sum(axis=axis)
-
-    num_obs = _count(terms, axis=axis)
-    ddof = np.asarray(ddof)
-    p = stats.distributions.chi2.sf(stat, num_obs - 1 - ddof)
-
-    return Power_divergenceResult(stat, p)
-###
+def line(t,a,t0):
+    return((t-t0)*a)
+def kv(t,G,t0):
+    return(tau0/G*(1-np.exp(-(t-t0)*G/eta)))
+def burger(t,G1):
+    return(tau0*(1/G0+1/G1*(1-np.exp(-t*G1/eta))+t/eta0))
 # Principal program
 if __name__=='__main__':
     # Import the data
-    folder = 'D:/STAGE M1/CHITOSAN/NORMALFORCE'
+    # folder = 'D:/STAGE M1/CHITOSAN/NORMALFORCE'
+    folder = 'D:/Documents/GitHub/chitosangels/Data'
     # The list was initially to automize a set of experiments :
     result_rheometer = [f for f in os.listdir(folder) if f.endswith("6_43 PM.csv")][0]
     data = pd.read_csv(folder+'/'+result_rheometer,skiprows=9,
@@ -391,15 +95,11 @@ if __name__=='__main__':
     # Need to verifiy it!
     # Equilibrium check on raw data with relaxation time (approximation) = No rescale of the curve!
     time_start1 = np.where(gap<=1)[0][0] #Ex. for 6_43 PM
-    time_stop = np.where(time>=2000)[0][0]
-   
-    
-    Chi = []
-    for i in tqdm(range(1750,10000)):
-    # time_stop = np.where(time>=2000)[0][0] # prev. 4000
-        X = time[time_start1:i]
-        Y = gap[time_start1:i]
-        param,cov = curve_fit(gaussian,X,Y,p0=(100,5),maxfev=10000)
+    time_stop = np.where(time>=2000)[0][0] #Ex. for 6_43 PM
+    X = time[time_start1:time_stop]
+    Y = gap[time_start1:time_stop]
+    param_exp,cov_exp = curve_fit(gaussian,X,Y,p0=(100,5),maxfev=10000)
+    # Note : to plot
     # plt.close('all')
     # plt.figure()
     # plt.plot(time,gap,c='green')
@@ -407,114 +107,143 @@ if __name__=='__main__':
     # plt.plot(X,gaussian(X,*param),c='blue')
     # plt.xlabel('Time (s)')
     # plt.ylabel('Gap (mm)')
-    # import scipy.stats as stats # For Chi test
+    '''
+    # Chi test section (you're not obliged to use it)
+    # Initialize your chi list
+    Chi = []
+    time_stop1 = 1750
+    time_stop2 = 10000
+    for i in tqdm(range(time_stop1,time_stop2)): 
+        # First method (if your time is not the same as before)
+        time_stop = np.where(time>=i)
+        X = time[time_start1:time_stop]
+        Y = gap[time_start1:time_stop]
+        param_exp,cov_exp = curve_fit(gaussian,X,Y,p0=(100,5),maxfev=10000)
+        # Second method
+        X = time[time_start1:i]
+        Y = gap[time_start1:i]
+        param_exp,cov_exp = curve_fit(gaussian,X,Y,p0=(100,5),maxfev=10000)
+        # Calculus of the chi value
         chi_square_test_statistic, p_value = chisquare(Y, gaussian(X,*param))
         Chi.append(chi_square_test_statistic)
-    
+    # PLOT SECTION
     plt.close('all')
-    plt.plot(np.arange(1750,10000),Chi)
+    time_list = np.arange(time_stop1,time_stop2)
+    plt.plot(time_list,Chi)
     plt.xlabel('Time stop (s)')
     plt.yscale('log')
     plt.ylabel(r'$\chi$')
-    #%%
-    Yfit = gaussienne(X,*param)
+    print('Stop time should be : %s s'%(time_list[np.argmin(Chi)])) # In order to maximize your chi test
+    '''
+    # Convertion to strain versus time   
+    Time = time[time_start:]
+    Strain = (gap[time_start] - gap[time_start:])/gap[time_start] # Full-time strain
+    # If we want to fit only the end of the curve (curly part, removing linear part):    
+    time_goal = time_start + np.where(Strain>=0.645)[0][0] # 0.63 is a arbitrary treshold, it depends on each experiment
+    # If we want to fit the line of the beginning
+    time_droite = time_start + np.where(Time>=7792)[0][0] # 7792 is a arbitrary treshold, it depends on each experiment
+    # If we want to remove the last part of the curve
+    time_stop = np.where(Time>=15850)[0][0] # Ex. previous one 16120, used for "6_43 PM" file
     
-    Xs = time1[time_start:]
-    Ys = (gap1[time_start] - gap1[time_start:])/gap1[time_start]# Strain all
-    
-    time_goal = time_start + np.where(Ys>=0.63)[0][0]
-    time_droite = time_start + np.where(time1>=7792)[0][0]
-    # Kelvin-Voigt Model for creep compliance
-    Xp = Xs[time_goal:]
-    Yp = Ys[time_goal:]
-    # Time stop for 6_43 PM
-    time_stop = np.where(Xs>=16120)[0][0]
+    ### Initializing all the curve parts to analyze ###
+    # Kelvin-Voigt Model for creep compliance (Data points)
+    Xkv = Time[time_goal:]
+    Ykv = Strain[time_goal:]
+    # Depending if you want to remove the last part of the curve, you can fit the last part of the curve (straight-like): 
     # Xd = Xs[time_droite:]
-    Xd = Xs[time_droite:time_stop]
+    Xd = Time[time_droite:time_stop]
     # Yd = Ys[time_droite:]
-    Yd = Ys[time_droite:time_stop]
+    Yd = Strain[time_droite:time_stop]
+    # To fit the first straight part (useful for fitting the parameter in KV model)
+    Strain_begin = 0.35
+    Strain_end = 0.6
+    Xl = time[time_start+np.where(Strain>Strain_begin)[0][0]:time_start+np.where(Strain<Strain_end)[0][-1]]
+    Yl = Strain[time_start+np.where(Strain>Strain_begin)[0][0]:time_start+np.where(Strain<Strain_end)[0][-1]]
+    # Depending if you want to erase the last part of the curve
+    Xp = Time[time_goal:time_stop]
+    Yp = Strain[time_goal:time_stop]
+    ###
     
-    param5,cov5 = curve_fit(line,Xd,Yd,p0=(1e-3,150),maxfev=10000)
-    
-    
-   
-    
-    Xl = time1[time_start+np.where(Ys>0.35)[0][0]:time_start+np.where(Ys<0.6)[0][-1]]
-    Yl = Ys[time_start+np.where(Ys>0.35)[0][0]:time_start+np.where(Ys<0.6)[0][-1]]
+    ### Fitting all your data, according to lines, Kelvin-Voigt and Burgers models
+    param2,cov2 = curve_fit(kv,Xp,Yp,p0=(1e3,100),maxfev=10000)
     param3,cov3 = curve_fit(line,Xl,Yl,p0=(1e-3,150),maxfev=10000)
-    tau0 = 20e-3/(np.pi*(1e-3)**2)
+    # For Burgers, you can choose to fit all the curve or at least the beginning part
+    # param4,cov4 = curve_fit(burger, Time, Strain, p0=(1e5),maxfev=10000)
+    param4,cov4 = curve_fit(burger, Time[:time_stop], Strain[:time_stop], p0=(1e5),maxfev=10000)
+    
+    param5,cov5 = curve_fit(line,Xd,Yd,p0=(1e-3,150),maxfev=10000)   
+    param42,cov42 = curve_fit(line,Time[time_stop:],Strain[time_stop:],p0=(1e-3,150),maxfev=10000)
+    ###
+    
+    ### Initializing your general data, either from fits or from experiments
+    Normal_force_instruction = 20e-3 # in N
+    Gel_diameter = 1e-3 # in m
+    tau0 = Normal_force_instruction/(np.pi*(Gel_diameter)**2) 
     eta = tau0/param3[0]
     eta0 = tau0/param5[0]
-    G0 = tau0/0.352
-    Xp = Xp[:time_stop]
-    Yp = Yp[:time_stop]
-    
-    param2,cov2 = curve_fit(kv,Xp,Yp,p0=(1e3,100),maxfev=10000)
-    # param4,cov4 = curve_fit(burger, Xs, Ys, p0=(1e5),maxfev=10000)
-    param4,cov4 = curve_fit(burger, Xs[:time_stop], Ys[:time_stop], p0=(1e5),maxfev=10000)
-    param42,cov42 = curve_fit(line,Xs[time_stop:],Ys[time_stop:],p0=(1e-3,150),maxfev=10000)
-    
-    plt.close('all')
-    
-    # 
-    plt.figure()
-    plt.plot(Xd,Yd)
-    plt.plot(Xd,line(Xd,*param5))
-    # PLOT OF CALCULATED DATA   
-    fig, ax1 = plt.subplots()
-    fig.set_size_inches([9,9])
-    
-    ax1.plot(Xs,Ys,label='Exp. (All)')
-    ax1.plot(Xl,line(Xl,*param3),label=r'Fit Line, $\eta = %s$'%(np.format_float_scientific(tau0/param3[0],precision=2)),ls='--',lw=4)
-    ax1.plot(Xd,line(Xd,*param5),label=r'Fit Line, $\eta = %s$'%(np.format_float_scientific(tau0/param5[0],precision=2)),lw=4,ls='--')
-    ax1.plot(Xs,burger(Xs,*param4),label=r'Fit Burger, $G= %s \pm %s$'%(round(param4[0],2),round(np.sqrt(np.diag(cov4)[0]),2)))
-    ax1.plot(Xs,kv(Xs,*param2),label=r'Fit KV., $G=%s \pm %s$'%(round(param2[0],2),round(np.sqrt(np.diag(cov2)[0]),2)))
-    ax1.plot(Xs[time_stop:],line(Xs[time_stop:],*param42),ls='--',c='red')
-    ax1.legend()
-    ax1.set_xlabel('Time (s)')
-    ax1.set_ylabel(r'Strain, $\gamma$')
-    ax1.set_title(r'Strain vs. Time for $F_{\mathrm{N}}=20\,\mathrm{mN}$')
-    ax1.axvline(x=time_goal,ls='--',lw=1,c='red')
-    
-    left, bottom, width, height = [0.40, 0.25, 0.30, 0.30]
-    ax2 = fig.add_axes([left, bottom, width, height])
-    ax2.plot(Xp,kv(Xp,*param2),label=r'Fit KV., $G=%s \pm %s$'%(round(param2[0],2),round(np.sqrt(np.diag(cov2)[0]),2)))
-    ax2.plot(Xp,burger(Xp,*param4),label=r'Fit Burger, $G= %s \pm %s$'%(round(param4[0],2),round(np.sqrt(np.diag(cov4)[0]),2)))
-    ax2.plot(Xp,Yp,label='Exp. (End)')
-    ax2.set_xlabel('Time (s)')
-    ax2.set_ylabel(r'Strain, $\gamma$')
-    ax2.set_title('Inset of End Region')
-    ax2.set_xlim([150,10800])
-    ax2.set_ylim([0.6,0.8])
-    ax2.legend()
-
-    # PLOT OF RAW DATA
-    plt.figure()
-    ax = plt.subplot(111)
-    ax.plot(time1,normalforce1,c='red')
-    ax.set_xlabel('Time (sec.)')
-    ax.set_ylabel(r'Normal force $F_{\mathrm{N}}$ (N)')
-    ax2=ax.twinx()
-    ax.yaxis.label.set_color('red') 
-    ax2.yaxis.label.set_color('blue') 
-    ax2.plot(time1,gap1,c='blue',label='Exp.')
-    # ax2.plot(X,Yfit,c='blue',ls='--',label=r'Fit, $\tau = %s \pm %s$'%(round(param[0],2),round(np.sqrt(np.diag(cov)[0]),2)))
-    plt.legend()
-    ax2.set_ylabel('Gap (mm)')
-    ax2.grid(ls='--')
-    ax.grid(ls='-')
-    
-    
+    G0 = tau0/Strain[time_start+np.where(Strain>Strain_begin)[0][0]] # To get an estimation of the offset at the beginning
     
     # PLOT
     plt.rc('text', usetex=True)
     plt.rc('text.latex', preamble=r'\usepackage{amsmath} \usepackage{lmodern} \usepackage{bm} \usepackage{xcolor}')
     #Options
     params = {'text.usetex' : True,
-              'font.size' : 20,
+              'font.size' : 15,
               'font.family' : 'lmodern',
               }
     plt.rcParams.update(params)
     mpl.rcParams['axes.linewidth'] = 1.
+    
+    plt.close('all')
+    
+    # PLOT OF CALCULATED DATA   
+    fig, ax1 = plt.subplots()
+    fig.set_size_inches([11,9])
+    
+    ax1.plot(Time,Strain,c='red',label='Exp. (All)')
+    ax1.plot(Xl,line(Xl,*param3),c='green',label=r'Line begin, $\eta = %s$'%(np.format_float_scientific(tau0/param3[0],precision=2)),ls='--',lw=4)
+    ax1.plot(Xd,line(Xd,*param5),c='orange',label=r'Line end, $\eta = %s$'%(np.format_float_scientific(tau0/param5[0],precision=2)),lw=4,ls='--')
+    ax1.plot(Time,burger(Time,*param4),c='purple',label=r'Fit Burger, $G= %s \pm %s$'%(round(param4[0],2),round(np.sqrt(np.diag(cov4)[0]),2)))
+    ax1.plot(Xp,kv(Xp,*param2),c='blue',label=r'Fit KV., $G=%s \pm %s$'%(round(param2[0],2),round(np.sqrt(np.diag(cov2)[0]),2)))
+    ax1.plot(Time[time_stop:],line(Time[time_stop:],*param42),ls='--',c='red',label='End behavior')
+    ax1.legend()
+    ax1.set_xlabel('Time (s)')
+    ax1.set_ylabel(r'Strain, $\gamma$')
+    ax1.set_title(r'Strain vs. Time for $F_{\mathrm{N}}=20\,\mathrm{mN}$')
+    ax1.axvline(x=time_goal,ls='--',lw=1,c='red')
+    
+    left, bottom, width, height = [0.30, 0.25, 0.30, 0.30]
+    ax2 = fig.add_axes([left, bottom, width, height])
+    ax2.plot(Xp,kv(Xp,*param2),c='blue',label=r'Fit KV., $G=%s \pm %s$'%(round(param2[0],2),round(np.sqrt(np.diag(cov2)[0]),2)))
+    ax2.plot(Xp,burger(Xp,*param4),c='purple',label=r'Fit Burger, $G= %s \pm %s$'%(round(param4[0],2),round(np.sqrt(np.diag(cov4)[0]),2)))
+    ax2.plot(Xp,Yp,c='red',label='Exp. (End)')
+    ax2.set_xlabel('Time (s)')
+    ax2.set_ylabel(r'Strain, $\gamma$')
+    ax2.set_title('Inset of End Region')
+    ax2.set_xlim([150,10800])
+    ax2.set_ylim([0.6,0.9])
+    ax2.legend()
+    plt.tight_layout()
+    save_fig_folder = 'D:/Documents/GitHub/chitosangels/Figures'
+    plt.savefig(save_fig_folder+'/'+'Fitted_curves_%s.png'%(result_rheometer))
+    # PLOT OF RAW DATA
+    plt.figure('Raw Data')
+    ax = plt.subplot(111)
+    ax.plot(time,normal_force,c='red')
+    ax.set_xlabel('Time (sec.)')
+    ax.set_ylabel(r'Normal force $F_{\mathrm{N}}$ (N)')
+    ax2=ax.twinx()
+    ax.yaxis.label.set_color('red') 
+    ax2.yaxis.label.set_color('blue') 
+    ax2.plot(time,gap,c='blue',label='Exp.')
+    # ax2.plot(X,Yfit,c='blue',ls='--',label=r'Fit, $\tau = %s \pm %s$'%(round(param[0],2),round(np.sqrt(np.diag(cov)[0]),2)))
+    plt.legend()
+    ax2.set_ylabel('Gap (mm)')
+    ax2.grid(ls='--')
+    ax.grid(ls='-')
+    plt.savefig(save_fig_folder+'/'+'Raw_data_%s.png'%(result_rheometer))
+    
+    
+    
     
 
