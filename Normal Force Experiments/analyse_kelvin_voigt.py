@@ -236,6 +236,8 @@ if __name__=='__main__':
     ax.yaxis.label.set_color('red') 
     ax2.yaxis.label.set_color('blue') 
     ax2.plot(time,gap,c='blue',label='Exp.')
+    ax1.grid()
+    ax2.grid()
     # ax2.plot(X,Yfit,c='blue',ls='--',label=r'Fit, $\tau = %s \pm %s$'%(round(param[0],2),round(np.sqrt(np.diag(cov)[0]),2)))
     plt.legend()
     ax2.set_ylabel('Gap (mm)')
