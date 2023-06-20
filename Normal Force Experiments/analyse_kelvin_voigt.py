@@ -96,8 +96,10 @@ if __name__=='__main__':
     # Equilibrium check on raw data with relaxation time (approximation) = No rescale of the curve!
     time_start1 = np.where(gap<=1)[0][0] #Ex. for 6_43 PM
     time_stop = np.where(time>=2000)[0][0] #Ex. for 6_43 PM
-    X = time[time_start1:time_stop]
-    Y = gap[time_start1:time_stop]
+    # X = time[time_start1:time_stop]
+    X = time[time_start1:]
+    # Y = gap[time_start1:time_stop]
+    Y = gap[time_start1:]
     param_exp,cov_exp = curve_fit(gaussian,X,Y,p0=(100,5),maxfev=10000)
     # Note : to plot
     # plt.close('all')
@@ -139,51 +141,61 @@ if __name__=='__main__':
     Time = time[time_start:]
     Strain = (gap[time_start] - gap[time_start:])/gap[time_start] # Full-time strain
     # If we want to fit only the end of the curve (curly part, removing linear part):    
-    time_goal = time_start + np.where(Strain>=0.645)[0][0] # 0.63 is a arbitrary treshold, it depends on each experiment
+    time_goal = time_start + np.where(Strain>=0.65)[0][0] # 0.63 is a arbitrary treshold, it depends on each experiment
+    # Prev. 0.645 (6_43 PM) ; 0.7 others
     # If we want to fit the line of the beginning
     time_droite = time_start + np.where(Time>=7792)[0][0] # 7792 is a arbitrary treshold, it depends on each experiment
     # If we want to remove the last part of the curve
-    time_stop = np.where(Time>=15850)[0][0] # Ex. previous one 16120, used for "6_43 PM" file
+    # time_stop = np.where(Time>=15850)[0][0] # Ex. previous one 16120, used for "6_43 PM" file
     
     ### Initializing all the curve parts to analyze ###
     # Kelvin-Voigt Model for creep compliance (Data points)
     Xkv = Time[time_goal:]
     Ykv = Strain[time_goal:]
     # Depending if you want to remove the last part of the curve, you can fit the last part of the curve (straight-like): 
-    # Xd = Xs[time_droite:]
-    Xd = Time[time_droite:time_stop]
-    # Yd = Ys[time_droite:]
-    Yd = Strain[time_droite:time_stop]
+    Xd = Time[time_droite:]
+    # Xd = Time[time_droite:time_stop]
+    Yd = Strain[time_droite:]
+    # Yd = Strain[time_droite:time_stop]
     # To fit the first straight part (useful for fitting the parameter in KV model)
-    Strain_begin = 0.35
-    Strain_end = 0.6
-    Xl = time[time_start+np.where(Strain>Strain_begin)[0][0]:time_start+np.where(Strain<Strain_end)[0][-1]]
+    Strain_begin = 0.340 # prev. 0.35
+    Strain_end = 0.556 # prev. 0.6
+    Xl = Time[time_start+np.where(Strain>Strain_begin)[0][0]:time_start+np.where(Strain<Strain_end)[0][-1]]
     Yl = Strain[time_start+np.where(Strain>Strain_begin)[0][0]:time_start+np.where(Strain<Strain_end)[0][-1]]
     # Depending if you want to erase the last part of the curve
-    Xp = Time[time_goal:time_stop]
-    Yp = Strain[time_goal:time_stop]
-    ###
-    
-    ### Fitting all your data, according to lines, Kelvin-Voigt and Burgers models
-    param2,cov2 = curve_fit(kv,Xp,Yp,p0=(1e3,100),maxfev=10000)
-    param3,cov3 = curve_fit(line,Xl,Yl,p0=(1e-3,150),maxfev=10000)
-    # For Burgers, you can choose to fit all the curve or at least the beginning part
-    # param4,cov4 = curve_fit(burger, Time, Strain, p0=(1e5),maxfev=10000)
-    param4,cov4 = curve_fit(burger, Time[:time_stop], Strain[:time_stop], p0=(1e5),maxfev=10000)
-    
-    param5,cov5 = curve_fit(line,Xd,Yd,p0=(1e-3,150),maxfev=10000)   
-    param42,cov42 = curve_fit(line,Time[time_stop:],Strain[time_stop:],p0=(1e-3,150),maxfev=10000)
+    # Tstop = 7000
+    # Xp = Time[time_goal:Tstop]
+    Xp = Time[time_goal:]
+    # Yp = Strain[time_goal:Tstop]
+    Yp = Strain[time_goal:]
     ###
     
     ### Initializing your general data, either from fits or from experiments
     Normal_force_instruction = 20e-3 # in N
     Gel_diameter = 1e-3 # in m
     tau0 = Normal_force_instruction/(np.pi*(Gel_diameter)**2) 
+    ###
+    
+    ### Fitting all your data, according to lines, Kelvin-Voigt and Burgers models
+    param3,cov3 = curve_fit(line,Xl,Yl,p0=(1e-3,150),maxfev=10000)
+    param5,cov5 = curve_fit(line,Xd,Yd,p0=(1e-3,150),maxfev=10000)   
+    # param42,cov42 = curve_fit(line,Time[time_stop:],Strain[time_stop:],p0=(1e-3,150),maxfev=10000)
+    ###
+    
+    ### Calculating some of the parameters
     eta = tau0/param3[0]
     eta0 = tau0/param5[0]
     G0 = tau0/Strain[time_start+np.where(Strain>Strain_begin)[0][0]] # To get an estimation of the offset at the beginning
+    ###
     
-    # PLOT
+    ### Fitting the data (Bis)
+    param2,cov2 = curve_fit(kv,Xp,Yp,p0=(1e3,100),maxfev=10000)
+    # For Burgers, you can choose to fit all the curve or at least the beginning part
+    # param4,cov4 = curve_fit(burger, Time[:time_stop], Strain[:time_stop], p0=(1e5),maxfev=10000)
+    param4,cov4 = curve_fit(burger, Time, Strain, p0=(1e5),maxfev=10000)
+    ###
+    
+    ### PLOT
     plt.rc('text', usetex=True)
     plt.rc('text.latex', preamble=r'\usepackage{amsmath} \usepackage{lmodern} \usepackage{bm} \usepackage{xcolor}')
     #Options
@@ -205,11 +217,11 @@ if __name__=='__main__':
     ax1.plot(Xd,line(Xd,*param5),c='orange',label=r'Line end, $\eta = %s$'%(np.format_float_scientific(tau0/param5[0],precision=2)),lw=4,ls='--')
     ax1.plot(Time,burger(Time,*param4),c='purple',label=r'Fit Burger, $G= %s \pm %s$'%(round(param4[0],2),round(np.sqrt(np.diag(cov4)[0]),2)))
     ax1.plot(Xp,kv(Xp,*param2),c='blue',label=r'Fit KV., $G=%s \pm %s$'%(round(param2[0],2),round(np.sqrt(np.diag(cov2)[0]),2)))
-    ax1.plot(Time[time_stop:],line(Time[time_stop:],*param42),ls='--',c='red',label='End behavior')
+    # ax1.plot(Time[time_stop:],line(Time[time_stop:],*param42),ls='--',c='red',label='End behavior')
     ax1.legend()
     ax1.set_xlabel('Time (s)')
     ax1.set_ylabel(r'Strain, $\gamma$')
-    ax1.set_title(r'Strain vs. Time for $F_{\mathrm{N}}=20\,\mathrm{mN}$')
+    ax1.set_title(r'Strain vs. Time for $F_{\mathrm{N}}=%s\,\mathrm{mN}$'%(round(np.mean(normal_force[300:])*1000,2)))
     ax1.axvline(x=time_goal,ls='--',lw=1,c='red')
     
     left, bottom, width, height = [0.30, 0.25, 0.30, 0.30]
@@ -220,12 +232,12 @@ if __name__=='__main__':
     ax2.set_xlabel('Time (s)')
     ax2.set_ylabel(r'Strain, $\gamma$')
     ax2.set_title('Inset of End Region')
-    ax2.set_xlim([150,10800])
+    ax2.set_xlim([150,np.max(Time)])
     ax2.set_ylim([0.6,0.9])
     ax2.legend()
     plt.tight_layout()
     save_fig_folder = 'D:/Documents/GitHub/chitosangels/Figures'
-    plt.savefig(save_fig_folder+'/'+'Fitted_curves_%s.png'%(result_rheometer))
+    # plt.savefig(save_fig_folder+'/'+'Fitted_curves_%s.png'%(result_rheometer))
     # PLOT OF RAW DATA
     plt.figure('Raw Data')
     ax = plt.subplot(111)
@@ -243,8 +255,35 @@ if __name__=='__main__':
     ax2.set_ylabel('Gap (mm)')
     ax2.grid(ls='--')
     ax.grid(ls='-')
-    plt.savefig(save_fig_folder+'/'+'Raw_data_%s.png'%(result_rheometer))
+    # plt.savefig(save_fig_folder+'/'+'Raw_data_%s.png'%(result_rheometer))
     
+    
+    ### STUDY OF THE EQUILIBRIUM
+    # Put the final time you're interested in
+    Time_end = np.argmax(Time) #prev. 9020 for 9_45 AM
+    # Time_end = np.where(Time>=9330)[0][0] # for 9_45 
+    # Time_end = np.where(Time>=15830)[0][0] 
+    # According to the KV model:
+    Strain_end_infty = tau0/param2[0]
+    Srain_end_experiment = Strain[Time_end]
+    relative_error = np.abs(Strain_end_infty-Strain)/Strain_end_infty*100
+    # print('Error : %s %%'%(np.abs(Strain_end_infty-Srain_end_experiment)/Strain_end_infty*100))
+    plt.figure()
+    plt.plot(Time,relative_error)
+    plt.xlabel('Time (s)')
+    plt.ylabel('Relative error %% ')
+    plt.ylim((0,100))
+    relative_error = relative_error[Time<=np.argmin(relative_error)]
+    error1 = Time[np.where(relative_error>=3)[0][-1]]
+    print('Time for 3%% : %s hours'%(error1/3600))
+    error2 = Time[np.where(relative_error>=5)[0][-1]]
+    print('Time for 5%% : %s hours'%(error2/3600))
+    error3 = Time[np.where(relative_error>=10)[0][-1]]
+    print('Time for 10%% : %s hours'%(error3/3600))
+    error4 = Time[np.where(relative_error>=20)[0][-1]]
+    print('Time for 20%% : %s hours'%(error4/3600))
+    error5 = Time[np.where(relative_error>=30)[0][-1]]
+    print('Time for 30%% : %s hours'%(error5/3600))
     
     
     
