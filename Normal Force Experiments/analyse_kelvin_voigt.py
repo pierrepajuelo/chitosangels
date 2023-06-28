@@ -13,8 +13,8 @@ import matplotlib as mpl
 import os
 from scipy.optimize import curve_fit
 from tqdm import tqdm
-from chisquare_old_version import * # Be sure that your working folder is the right one
-
+# from chisquare_old_version import * # Be sure that your working folder is the right one
+import scipy.special as ssp
 # Definition of functions
 def data_format(data):
     """
@@ -72,15 +72,20 @@ def line(t,a,t0):
     return((t-t0)*a)
 def kv(t,G,t0):
     return(tau0/G*(1-np.exp(-(t-t0)*G/eta)))
-def burger(t,G1):
-    return(tau0*(1/G0+1/G1*(1-np.exp(-t*G1/eta))+t/eta0))
+
+# def burger(t,G1):
+#     return(tau0*(1/G0+1/G1*(1-np.exp(-t*G1/eta))+t/eta0))
+
+def springpot(t,alpha,lambda1):
+    J = tau0*(1/ssp.gamma(alpha+1)*(lambda1*t**alpha*np.heaviside(t,1)))
+    return(J)
 # Principal program
 if __name__=='__main__':
     # Import the data
     # folder = 'D:/STAGE M1/CHITOSAN/NORMALFORCE'
     folder = 'D:/Documents/GitHub/chitosangels/Data'
     # The list was initially to automize a set of experiments :
-    result_rheometer = [f for f in os.listdir(folder) if f.endswith("6_43 PM.csv")][0]
+    result_rheometer = [f for f in os.listdir(folder) if f.endswith("4_05 PM.csv")][0]
     data = pd.read_csv(folder+'/'+result_rheometer,skiprows=9,
                        sep='\t', lineterminator='\r',encoding = "utf-16",
                        low_memory=False) #,sep=',',encoding='latin1',
@@ -94,12 +99,12 @@ if __name__=='__main__':
     time_start = np.where(normal_force>=0.0025)[0][0]
     # Need to verifiy it!
     # Equilibrium check on raw data with relaxation time (approximation) = No rescale of the curve!
-    time_start1 = np.where(gap<=1)[0][0] #Ex. for 6_43 PM
-    time_stop = np.where(time>=2000)[0][0] #Ex. for 6_43 PM
+    # time_start1 = np.where(gap<=1)[0][0] #Ex. for 6_43 PM
+    # time_stop = np.where(time>=2000)[0][0] #Ex. for 6_43 PM
     # X = time[time_start1:time_stop]
-    X = time[time_start1:]
+    X = time[time_start:]
     # Y = gap[time_start1:time_stop]
-    Y = gap[time_start1:]
+    Y = gap[time_start:]
     param_exp,cov_exp = curve_fit(gaussian,X,Y,p0=(100,5),maxfev=10000)
     # Note : to plot
     # plt.close('all')
@@ -109,6 +114,14 @@ if __name__=='__main__':
     # plt.plot(X,gaussian(X,*param),c='blue')
     # plt.xlabel('Time (s)')
     # plt.ylabel('Gap (mm)')
+    
+    ### Initializing your general data, either from fits or from experiments
+    # Normal_force_instruction = 20e-3 # in N
+    Normal_force_instruction = round(np.mean(normal_force[300:]),6)
+    Gel_diameter = 1e-3 # in m
+    tau0 = Normal_force_instruction/(np.pi*(Gel_diameter)**2) 
+    ###
+    
     '''
     # Chi test section (you're not obliged to use it)
     # Initialize your chi list
@@ -141,58 +154,86 @@ if __name__=='__main__':
     Time = time[time_start:]
     Strain = (gap[time_start] - gap[time_start:])/gap[time_start] # Full-time strain
     # If we want to fit only the end of the curve (curly part, removing linear part):    
-    time_goal = time_start + np.where(Strain>=0.65)[0][0] # 0.63 is a arbitrary treshold, it depends on each experiment
-    # Prev. 0.645 (6_43 PM) ; 0.7 others
-    # If we want to fit the line of the beginning
-    time_droite = time_start + np.where(Time>=7792)[0][0] # 7792 is a arbitrary treshold, it depends on each experiment
+    time_goal = np.where(Strain>=0.0852)[0][0] # other 0.5 #other prev 0.7 # 0.63 is a arbitrary treshold, it depends on each experiment
+    # Prev. 0.645 (6_43 PM) ; 0.7 others # 0.65 
+    # If we want to fit the line of the end
+    # time_droite = np.where(Time>=7792)[0][0] # 7792 is a arbitrary treshold, it depends on each experiment
     # If we want to remove the last part of the curve
     # time_stop = np.where(Time>=15850)[0][0] # Ex. previous one 16120, used for "6_43 PM" file
+    # time_stop = np.where(Strain>=0.7)[0][0]
+    
+    ### First of all: fitting the first part of the curve
+    # To fit the first straight part (useful for fitting the parameter in KV model)
+    Strain_begin = 0.050 # 0.3 # other prev. 0.340 # prev. 0.35
+    Strain_end = 0.080 # 0.4 # other prev. 0.556 # prev. 0.6
+    Xl = Time[np.where(Strain>Strain_begin)[0][0]:np.where(Strain<Strain_end)[0][-1]]
+    Yl = Strain[np.where(Strain>Strain_begin)[0][0]:np.where(Strain<Strain_end)[0][-1]]
+    param3,cov3 = curve_fit(line,Xl,Yl,p0=(1e-3,150),maxfev=10000)
+    
+    
+    ### Calculating first a paramater
+    eta = tau0/param3[0]
+    ###
+    
+    ### Finding the better fit possible !
+    Chi = []
+    time_fit_first = np.where(Time>=207)[0][0] # 3000
+    time_fit_end = np.where(Time>=782)[0][0] # 6000
+    endend = np.where(Time>=1374)[0][0] # 7257
+    for end in tqdm(range(time_fit_first,time_fit_end)):
+        X1 = Time[time_goal:end]
+        Y1 = Strain[time_goal:end]
+        X2 = Time[end:endend]
+        Y2 = Strain[end:endend]
+        param7,cov7 = curve_fit(kv,X1,Y1,p0=(1e3,100),maxfev=10000)
+        param8,cov8 = curve_fit(line,X2,Y2,p0=(1e-3,150),maxfev=10000)
+        Y_origin = Strain[time_goal:endend]
+        Y_fit = np.hstack((kv(X1,*param7),line(X2,*param8)))
+        Chi.append(np.sum((Y_fit-Y_origin)**2)/(Time[time_goal:endend].shape[0]-4))
+    time_stop = np.arange(time_fit_first,time_fit_end)[np.argmin(Chi)] # eg. 4162 for 2_34 PM
+    print('\n Optimal end point : %s'%np.arange(time_fit_first,time_fit_end)[np.argmin(Chi)])
     
     ### Initializing all the curve parts to analyze ###
     # Kelvin-Voigt Model for creep compliance (Data points)
     Xkv = Time[time_goal:]
     Ykv = Strain[time_goal:]
     # Depending if you want to remove the last part of the curve, you can fit the last part of the curve (straight-like): 
-    Xd = Time[time_droite:]
+    # Xd = Time[time_droite:]
     # Xd = Time[time_droite:time_stop]
-    Yd = Strain[time_droite:]
+    # Yd = Strain[time_droite:]
     # Yd = Strain[time_droite:time_stop]
-    # To fit the first straight part (useful for fitting the parameter in KV model)
-    Strain_begin = 0.340 # prev. 0.35
-    Strain_end = 0.556 # prev. 0.6
-    Xl = Time[time_start+np.where(Strain>Strain_begin)[0][0]:time_start+np.where(Strain<Strain_end)[0][-1]]
-    Yl = Strain[time_start+np.where(Strain>Strain_begin)[0][0]:time_start+np.where(Strain<Strain_end)[0][-1]]
+    
     # Depending if you want to erase the last part of the curve
-    # Tstop = 7000
+    # Tstop = np.where(Time>=1374)[0][0]
     # Xp = Time[time_goal:Tstop]
-    Xp = Time[time_goal:]
+    # Xp = Time[time_goal:]
+    Xp = Time[time_goal:time_stop]
+    # Xp = np.copy(Xkv)
     # Yp = Strain[time_goal:Tstop]
-    Yp = Strain[time_goal:]
+    # Yp = Strain[time_goal:]
+    Yp = Strain[time_goal:time_stop]
+    # Yp = np.copy(Ykv)
     ###
     
-    ### Initializing your general data, either from fits or from experiments
-    Normal_force_instruction = 20e-3 # in N
-    Gel_diameter = 1e-3 # in m
-    tau0 = Normal_force_instruction/(np.pi*(Gel_diameter)**2) 
-    ###
+    
     
     ### Fitting all your data, according to lines, Kelvin-Voigt and Burgers models
-    param3,cov3 = curve_fit(line,Xl,Yl,p0=(1e-3,150),maxfev=10000)
-    param5,cov5 = curve_fit(line,Xd,Yd,p0=(1e-3,150),maxfev=10000)   
+    
+    # param5,cov5 = curve_fit(line,Xd,Yd,p0=(1e-3,150),maxfev=10000)   
     # param42,cov42 = curve_fit(line,Time[time_stop:],Strain[time_stop:],p0=(1e-3,150),maxfev=10000)
     ###
     
     ### Calculating some of the parameters
-    eta = tau0/param3[0]
-    eta0 = tau0/param5[0]
-    G0 = tau0/Strain[time_start+np.where(Strain>Strain_begin)[0][0]] # To get an estimation of the offset at the beginning
+    # eta0 = tau0/param5[0]
+    # G0 = tau0/Strain[time_start+np.where(Strain>Strain_begin)[0][0]] # To get an estimation of the offset at the beginning
     ###
     
     ### Fitting the data (Bis)
     param2,cov2 = curve_fit(kv,Xp,Yp,p0=(1e3,100),maxfev=10000)
+    # param6,cov6 = curve_fit(springpot,Time[Strain>0.4],Strain[Strain>0.4],p0=(0.5,10),maxfev=10000)
     # For Burgers, you can choose to fit all the curve or at least the beginning part
     # param4,cov4 = curve_fit(burger, Time[:time_stop], Strain[:time_stop], p0=(1e5),maxfev=10000)
-    param4,cov4 = curve_fit(burger, Time, Strain, p0=(1e5),maxfev=10000)
+    # param4,cov4 = curve_fit(burger, Time, Strain, p0=(1e5),maxfev=10000)
     ###
     
     ### PLOT
@@ -214,26 +255,30 @@ if __name__=='__main__':
     
     ax1.plot(Time,Strain,c='red',label='Exp. (All)')
     ax1.plot(Xl,line(Xl,*param3),c='green',label=r'Line begin, $\eta = %s$'%(np.format_float_scientific(tau0/param3[0],precision=2)),ls='--',lw=4)
-    ax1.plot(Xd,line(Xd,*param5),c='orange',label=r'Line end, $\eta = %s$'%(np.format_float_scientific(tau0/param5[0],precision=2)),lw=4,ls='--')
-    ax1.plot(Time,burger(Time,*param4),c='purple',label=r'Fit Burger, $G= %s \pm %s$'%(round(param4[0],2),round(np.sqrt(np.diag(cov4)[0]),2)))
+    # ax1.plot(Xd,line(Xd,*param5),c='orange',label=r'Line end, $\eta = %s$'%(np.format_float_scientific(tau0/param5[0],precision=2)),lw=4,ls='--')
+    # ax1.plot(Time,burger(Time,*param4),c='purple',label=r'Fit Burger, $G= %s \pm %s$'%(round(param4[0],2),round(np.sqrt(np.diag(cov4)[0]),2)))
     ax1.plot(Xp,kv(Xp,*param2),c='blue',label=r'Fit KV., $G=%s \pm %s$'%(round(param2[0],2),round(np.sqrt(np.diag(cov2)[0]),2)))
+    #Springpot
+    # ax1.plot(Time,springpot(Time,*param6),c='black',label=r'Fit Springpot, $\alpha = %s$'%(round(param6[0],3)))
     # ax1.plot(Time[time_stop:],line(Time[time_stop:],*param42),ls='--',c='red',label='End behavior')
     ax1.legend()
     ax1.set_xlabel('Time (s)')
     ax1.set_ylabel(r'Strain, $\gamma$')
     ax1.set_title(r'Strain vs. Time for $F_{\mathrm{N}}=%s\,\mathrm{mN}$'%(round(np.mean(normal_force[300:])*1000,2)))
-    ax1.axvline(x=time_goal,ls='--',lw=1,c='red')
+    ax1.axvline(x=Time[time_goal],ls='--',lw=1,c='red')
     
     left, bottom, width, height = [0.30, 0.25, 0.30, 0.30]
     ax2 = fig.add_axes([left, bottom, width, height])
     ax2.plot(Xp,kv(Xp,*param2),c='blue',label=r'Fit KV., $G=%s \pm %s$'%(round(param2[0],2),round(np.sqrt(np.diag(cov2)[0]),2)))
-    ax2.plot(Xp,burger(Xp,*param4),c='purple',label=r'Fit Burger, $G= %s \pm %s$'%(round(param4[0],2),round(np.sqrt(np.diag(cov4)[0]),2)))
+    # ax2.plot(Xp,burger(Xp,*param4),c='purple',label=r'Fit Burger, $G= %s \pm %s$'%(round(param4[0],2),round(np.sqrt(np.diag(cov4)[0]),2)))
     ax2.plot(Xp,Yp,c='red',label='Exp. (End)')
+    #Springpot
+    # ax2.plot(Xp,springpot(Xp,*param6),c='black',label=r'Fit Springpot, $\alpha = %s$'%(round(param6[0],3)))
     ax2.set_xlabel('Time (s)')
     ax2.set_ylabel(r'Strain, $\gamma$')
     ax2.set_title('Inset of End Region')
-    ax2.set_xlim([150,np.max(Time)])
-    ax2.set_ylim([0.6,0.9])
+    # ax2.set_xlim([150,np.max(Time)])
+    # ax2.set_ylim([,0.9])
     ax2.legend()
     plt.tight_layout()
     save_fig_folder = 'D:/Documents/GitHub/chitosangels/Figures'
@@ -255,6 +300,7 @@ if __name__=='__main__':
     ax2.set_ylabel('Gap (mm)')
     ax2.grid(ls='--')
     ax.grid(ls='-')
+    plt.tight_layout()
     # plt.savefig(save_fig_folder+'/'+'Raw_data_%s.png'%(result_rheometer))
     
     
@@ -285,6 +331,10 @@ if __name__=='__main__':
     error5 = Time[np.where(relative_error>=30)[0][-1]]
     print('Time for 30%% : %s hours'%(error5/3600))
     
-    
-    
-
+    ### PLOT OF THE CHI PARAMATER
+    # plt.figure()
+    # plt.semilogy(np.arange(time_fit_first,time_fit_end),Chi)
+    # plt.xlabel('End point')
+    # plt.ylabel(r'$\chi^2$')
+    # plt.axvline(x=minimum,c='red',ls='--')
+    ###

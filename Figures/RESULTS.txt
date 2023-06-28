@@ -4,3 +4,5 @@ File name | Applied normal force | Last strain registered | Error made (using ex
 20mN_PP25S_1_4mm_3h_5_30_2023 6_43 PM.csv | 19.99mN | (Avoiding linear end) 0.845 | 1.49% | G = 7642.77 +- 0.72 Pa, eta = 2.89e+7 Pa.s
 20mN_PP25S_1_4mm_3h_5_30_2023 3_13 PM.csv | 20.06mN | 0.80 | 1.83% | G = 8095.56 +- 1.28, eta = 2.03e+7 Pa.s 
 6_43 PM.csv (avoiding the two linear parts) | 20 mN | 0.785 | 2.55% | G = 7903.96 +- 0.65 Pa, eta = 2.32e+7 Pa.s
+10mN_PP25S_4mm_4h_6_16_2023 2_34 PM.csv (avoiding torque) | 8.93 mN | 0.676 | 0.464% | G = 4068.8 +- 0.81 Pa, eta = 6.16e+6 Pa.s
+
