@@ -1,0 +1,4 @@
+File name | Applied normal force | Last strain registered | Error made (using exponential) | KV parameters
+5pchitosan_5mN_Hyst0_1mN_6_28_2023 2_48 PM.csv | 4.93mN | 0.07318 | 0.01335% | G = 21440.21 +- 10.55 Pa, eta = 9.17e+06 Pa.s 
+5pchitosan_5mN_Hyst0_1mN_6_28_2023 1_47 PM.csv | 4.96mN | 0.08469 | 0.065% | G = 18634.97 +- 15.88 Pa, eta = 4.06e+06 Pa.s
+5pchitosan_5mN_Hyst0_1mN_6_29_2023 10_10 AM.csv | 5.1mN | 0.1127 +- 0.0068 | 0.024% | G = 14418.97 +- 3.19 Pa, eta = 4.39e+6 Pa.s
