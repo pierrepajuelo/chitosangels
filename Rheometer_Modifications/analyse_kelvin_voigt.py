@@ -98,16 +98,16 @@ def analysis(time,gap,normal_force,
     ### Finding the better fit possible !
     if optim_evap_torque:
         Chi = []
-        time_fit_first = np.where(Time>=4037)[0][0] # 207, 3000
-        time_fit_end = np.where(Time>=6000)[0][0] # 782, 6000
-        endend = np.where(Time>=7000)[0][0] # 7257
+        time_fit_first = np.where(Time>=Time[-1]/2)[0][0] # 207, 3000 # PREV 4037
+        time_fit_end = np.where(Time>=Time[-1]*(9/10))[0][0] # 782, 6000 # PREV 6000
+        endend = np.where(Time>=Time[-1]*(99/100))[0][0] # 7257 # PREV 7000
         for end in tqdm(range(time_fit_first,time_fit_end,100)):
             X1 = Time[time_goal:end]
             Y1 = Strain[time_goal:end]
             X2 = Time[end:endend]
             Y2 = Strain[end:endend]
             param7,cov7 = curve_fit(kv,X1,Y1,p0=(1e3,100,eta),maxfev=10000)
-            param8,cov8 = curve_fit(line,X2,Y2,p0=(1e-3,150),maxfev=10000)
+            param8,cov8 = curve_fit(line,X2,Y2,p0=(1e-3,150),maxfev=100000)
             Y_origin = Strain[time_goal:endend]
             Y_fit = np.hstack((kv(X1,*param7),line(X2,*param8)))
             Chi.append(np.sum((Y_fit-Y_origin)**2)/(Time[time_goal:endend].shape[0]-4))
@@ -157,7 +157,7 @@ def plottingresult(Xl,param3,Xp,Yp,param2,Time,Strain,
     ax1.set_title(r'Strain vs. Time for $F_{\mathrm{N}}=%s\,\mathrm{mN}$'%(round(np.mean(normal_force[300:])*1000,2)))
     ax1.axvline(x=Time[time_goal],ls='--',lw=1,c='red')
     
-    left, bottom, width, height = [0.3, 0.2, 0.5, 0.2]
+    left, bottom, width, height = [0.3, 0.3, 0.5, 0.2]
     ax2 = fig.add_axes([left, bottom, width, height])
     ax2.plot(Xp,kv(Xp,*param2),c='blue',label=r'Fit KV., $G=%s \pm %s$'%(round(param2[0],2),round(np.sqrt(np.diag(cov2)[0]),2)))
     # ax2.plot(Xp,burger(Xp,*param4),c='purple',label=r'Fit Burger, $G= %s \pm %s$'%(round(param4[0],2),round(np.sqrt(np.diag(cov4)[0]),2)))
@@ -213,7 +213,7 @@ def springpot(t,alpha,lambda1):
     return(J)
 def cauchy(x,a,b,c):
     return(a/(np.pi*(1+b*x**2))+c)
-
+#%%
 # Principal program
 if __name__=='__main__':
     # Import the data
@@ -471,20 +471,25 @@ if __name__=='__main__':
     ###
     #%% Update of the program
     # General informations
-    folder = "C:/Users/afn/Documents/FractureDynamics/Reometer_Data" 
+    # folder = "C:/Users/afn/Documents/FractureDynamics/Reometer_Data" 
+    folder = 'D:/Documents/GitHub/chitosangels/Rheometer_Modifications'
     ###
     # result_rheometer = [f for f in os.listdir(folder) if f.endswith("30_2023 10_07 AM.csv")][0]
-    result_rheometer = [f for f in os.listdir(folder) if f.endswith("29_2023 4_00 PM.csv")][0]
+    
+    ### In the following, we'll analyze only the 1.5mm diameter gels :
+    Gel_diameter = 1.5e-3/2 # in m
+    ###
+    result_rheometer = [f for f in os.listdir(folder) if f.endswith("4_2023 2_17 PM.csv")][0]
     data = pd.read_csv(folder+'/'+result_rheometer,skiprows=9,
                        sep='\t', lineterminator='\r',encoding = "utf-16",
                        low_memory=False).drop(columns='\n')
     time,gap,normal_force = data_format_bis(data)
     Normal_force_instruction = round(np.mean(normal_force[300:]),6)
-    Gel_diameter = 1.5e-3/2 # in m
+    
     tau0 = Normal_force_instruction/(np.pi*(Gel_diameter)**2) 
     time_goal,Xl,Yl,param3,Xp,Yp,param2,cov2,Strain,Time,param_relu,time_start_relu = analysis(time,
                                                                     gap,
-                                                                    normal_force)
+                                                                    normal_force,optim_evap_torque=True)
     plottingresult(Xl,param3,Xp,Yp,param2,Time,Strain,
                        time,normal_force,gap,
                        time_goal,param_relu,time_start_relu)
