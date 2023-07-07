@@ -30,12 +30,12 @@ if __name__=='__main__':
     # errbars = np.array([3.86,1.21,1.49,1.83])/100
     # stress  = np.array([6.9,19.9,19.99,20.06])
     # folder = 'D:/Documents/GitHub/chitosangels/Figures'
-    param,cov = curve_fit(line,strain,stress,p0=(10e3),maxfev=10000)
+    param,cov = curve_fit(line,strain[strain<0.3],stress[strain<0.3],p0=(10e3),maxfev=10000)
     # PLOT
     plt.close('all')
     plt.figure()
     plt.errorbar(strain,stress,c='blue',marker='o',xerr=errbars,lw=1,ls='None',ms=5,capsize=3)
-    plt.plot(np.linspace(0,1,100),line(np.linspace(0,1,100),*param),ls='--',label=r'Linear fit, $E = %s$ kPa'%round(param[0]/1e3,3))
+    plt.plot(np.linspace(0,0.6,100),line(np.linspace(0,0.6,100),*param),ls='--',label=r'Linear fit, $E = %s$ kPa'%round(param[0]/1e3,3))
     plt.xlabel(r'Strain, $\gamma$')
     plt.ylabel(r'Stress, $\sigma$ (Pa)')
     plt.grid()
