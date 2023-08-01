@@ -72,12 +72,15 @@ def analysis(time,gap,normal_force,
              linear_beginning=0.1067,
              linear_end=0.1287,
              optim_evap_torque=False,
-             optim_value=-1):
+             optim_value=-1,
+             relu_end = 1000,
+             fraction_time=2):
     time_start = np.where(normal_force>=0.0025)[0][0]
     ## NEW WAY TO FIND THE BEGIN POINT OF EXPERIMENT
-    param_relu,cov_relu = curve_fit(ReLU,time[:1000],normal_force[:1000],p0=(10,10,10),
+    param_relu,cov_relu = curve_fit(ReLU,time[:relu_end],normal_force[:relu_end],p0=(10,10,10),
                                     maxfev = 10000)
     time_start_relu = np.where(time>=(param_relu[1]-param_relu[2])/param_relu[0])[0][0]
+    print('Relative error :', (gap[time_start_relu]-gap[time_start])/gap[time_start_relu])
     # print('Time of start with a criterium : %s'%(time_start))
     # print('Time of start with ReLU : %s'%(time_start_relu))
     
@@ -98,7 +101,7 @@ def analysis(time,gap,normal_force,
     ### Finding the better fit possible !
     if optim_evap_torque:
         Chi = []
-        time_fit_first = np.where(Time>=Time[-1]/2)[0][0] # 207, 3000 # PREV 4037
+        time_fit_first = np.where(Time>=Time[-1]/fraction_time)[0][0] # 207, 3000 # PREV 4037
         time_fit_end = np.where(Time>=Time[-1]*(9/10))[0][0] # 782, 6000 # PREV 6000
         endend = np.where(Time>=Time[-1]*(99/100))[0][0] # 7257 # PREV 7000
         for end in tqdm(range(time_fit_first,time_fit_end,100)):
@@ -126,13 +129,14 @@ def analysis(time,gap,normal_force,
 def plottingresult(Xl,param3,Xp,Yp,param2,Time,Strain,
                    time,normal_force,gap,
                    time_goal,param_relu,time_start_relu,
-                   time_stop):
+                   time_stop,
+                   end_relu):
     ### PLOT
     plt.rc('text', usetex=True)
     plt.rc('text.latex', preamble=r'\usepackage{amsmath} \usepackage{lmodern} \usepackage{bm} \usepackage{xcolor}')
     #Options
     params = {'text.usetex' : True,
-              'font.size' : 15,
+              'font.size' : 18,
               'font.family' : 'lmodern',
               }    
     plt.rcParams.update(params)
@@ -145,10 +149,10 @@ def plottingresult(Xl,param3,Xp,Yp,param2,Time,Strain,
     fig.set_size_inches([11,9])
     
     ax1.plot(Time,Strain,c='red',label='Exp. (All)')
-    ax1.plot(Xl,line(Xl,*param3),c='green',label=r'Line begin, $\eta = %s$'%(np.format_float_scientific(tau0/param3[0],precision=2)),ls='--',lw=4)
+    ax1.plot(Xl,line(Xl,*param3),c='green',label=r'Line begin, $\eta = %s\,\mathrm{Pa}\cdot\mathrm{s}$'%(np.format_float_scientific(tau0/param3[0],precision=2)),ls='--',lw=4)
     # ax1.plot(Xd,line(Xd,*param5),c='orange',label=r'Line end, $\eta = %s$'%(np.format_float_scientific(tau0/param5[0],precision=2)),lw=4,ls='--')
     # ax1.plot(Time,burger(Time,*param4),c='purple',label=r'Fit Burger, $G= %s \pm %s$'%(round(param4[0],2),round(np.sqrt(np.diag(cov4)[0]),2)))
-    ax1.plot(Xp,kv(Xp,*param2),c='blue',label=r'Fit KV., $G=%s \pm %s$'%(round(param2[0],2),round(np.sqrt(np.diag(cov2)[0]),2)))
+    ax1.plot(Xp,kv(Xp,*param2),c='blue',label=r'Fit KV., $G=%s \pm %s\,\mathrm{kPa}$'%(round(param2[0]/1e3,3),round(np.sqrt(np.diag(cov2)[0])/1e3,3)))
     #Springpot
     # ax1.plot(Time,springpot(Time,*param6),c='black',label=r'Fit Springpot, $\alpha = %s$'%(round(param6[0],3)))
     # ax1.plot(Time[time_stop:],line(Time[time_stop:],*param42),ls='--',c='red',label='End behavior')
@@ -158,9 +162,9 @@ def plottingresult(Xl,param3,Xp,Yp,param2,Time,Strain,
     ax1.set_title(r'Strain vs. Time for $F_{\mathrm{N}}=%s\,\mathrm{mN}$'%(round(np.mean(normal_force[300:])*1000,2)))
     ax1.axvline(x=Time[time_goal],ls='--',lw=1,c='red')
     ax1.axvline(x=Time[time_stop],ls='--',lw=1,c='blue')
-    left, bottom, width, height = [0.3, 0.3, 0.5, 0.2]
+    left, bottom, width, height = [0.3, 0.4, 0.5, 0.2]
     ax2 = fig.add_axes([left, bottom, width, height])
-    ax2.plot(Xp,kv(Xp,*param2),c='blue',label=r'Fit KV., $G=%s \pm %s$'%(round(param2[0],2),round(np.sqrt(np.diag(cov2)[0]),2)))
+    ax2.plot(Xp,kv(Xp,*param2),c='blue',label=r'Fit KV., $G=%s \pm %s\,\mathrm{kPa}$'%(round(param2[0]/1e3,3),round(np.sqrt(np.diag(cov2)[0])/1e3,3)))
     # ax2.plot(Xp,burger(Xp,*param4),c='purple',label=r'Fit Burger, $G= %s \pm %s$'%(round(param4[0],2),round(np.sqrt(np.diag(cov4)[0]),2)))
     ax2.plot(Xp,Yp,c='red',label='Exp. (End)')
     #Springpot
@@ -171,12 +175,14 @@ def plottingresult(Xl,param3,Xp,Yp,param2,Time,Strain,
     # ax2.set_xlim([150,np.max(Time)])
     # ax2.set_ylim([,0.9])
     ax2.legend()
+    ax1.grid(ls='--')
+    ax2.grid(ls='-')
     plt.tight_layout()
     save_fig_folder = 'D:/Documents/GitHub/chitosangels/Figures'
     # plt.savefig(save_fig_folder+'/'+'Fitted_curves_%s.png'%(result_rheometer))
     # PLOT OF RAW DATA
-    plt.figure('Raw Data')
-    ax = plt.subplot(111)
+    # plt.figure('Raw Data')
+    fig, ax = plt.subplots()
     ax.plot(time,normal_force,c='red')
     ax.set_xlabel('Time (sec.)')
     ax.set_ylabel(r'Normal force $F_{\mathrm{N}}$ (N)')
@@ -184,18 +190,27 @@ def plottingresult(Xl,param3,Xp,Yp,param2,Time,Strain,
     ax.yaxis.label.set_color('red') 
     ax2.yaxis.label.set_color('blue') 
     ax2.plot(time,gap,c='blue',label='Exp.')
-    ax1.grid()
-    ax2.grid()
+    # ax1.grid()
+    # ax2.grid()
     # ax2.plot(X,Yfit,c='blue',ls='--',label=r'Fit, $\tau = %s \pm %s$'%(round(param[0],2),round(np.sqrt(np.diag(cov)[0]),2)))
-    plt.legend()
+    
     ax2.set_ylabel('Gap (mm)')
     ax2.grid(ls='--')
     ax.grid(ls='-')
     ## ReLU TESTS
-    ax.plot(time[:1000],ReLU(time[:1000],*param_relu),ls='--',c='green')
+    ax.plot(time[:end_relu],ReLU(time[:end_relu],*param_relu),ls='--',c='green',label='ReLU fit')
     # ax.axvline(x=time[time_start],ls='-',c='cyan')
-    ax.axvline(x=time[time_start_relu],ls='-',c='purple')
-    
+    ax.axvline(x=time[time_start_relu],ls='-',c='purple',label='ReLU contact gap')
+    ax.legend(facecolor='white', framealpha=1)
+    left, bottom, width, height = [0.22, 0.6, 0.5, 0.2]
+    ax3 = fig.add_axes([left, bottom, width, height])
+    ax3.plot(time,normal_force,c='red')
+    ax3.plot(time[:end_relu],ReLU(time[:end_relu],*param_relu),ls='--',c='green',label='ReLU fit')
+    ax3.axvline(x=time[time_start_relu],ls='-',c='purple',label='ReLU contact gap')
+    ax3.set_xlim((0,300))
+    ax3.set_ylim((-0.001,0.006))
+    ax3.grid(ls='-')
+    ax3.set_title('Inset of First Region')
 # Functions for fitting
 def gaussian(t,tau,a):
     return(a*(np.exp(-(t-t[0])/tau)+1))
@@ -480,25 +495,67 @@ if __name__=='__main__':
     ### In the following, we'll analyze only the 1.5mm diameter gels :
     Gel_diameter = 1.5e-3/2 # in m
     ###
-    result_rheometer = [f for f in os.listdir(folder) if f.endswith("5_2023 2_20 PM.csv")][0]
+    result_rheometer = [f for f in os.listdir(folder) if f.endswith("30_2023 5_11 PM.csv")][0]
     data = pd.read_csv(folder+'/'+result_rheometer,skiprows=9,
                        sep='\t', lineterminator='\r',encoding = "utf-16",
                        low_memory=False).drop(columns='\n')
     time,gap,normal_force = data_format_bis(data)
-    Normal_force_instruction = round(np.mean(normal_force[300:]),6)
+    Normal_force_instruction = round(np.mean(normal_force[700:]),6)
     
     tau0 = Normal_force_instruction/(np.pi*(Gel_diameter)**2) 
     time_goal,Xl,Yl,param3,Xp,Yp,param2,cov2,Strain,Time,param_relu,time_start_relu,time_stop = analysis(time,
                                                                     gap,
                                                                     normal_force,optim_evap_torque=True,
-                                                                    linear_beginning=0.06,
-                                                                    linear_end=0.07)
+                                                                    # optim_value = 31468,
+                                                                    linear_beginning=0.14,
+                                                                    linear_end=0.160,
+                                                                    relu_end=500,
+                                                                    fraction_time=1.5)
     plottingresult(Xl,param3,Xp,Yp,param2,Time,Strain,
                        time,normal_force,gap,
-                       time_goal,param_relu,time_start_relu,time_stop)
+                       time_goal,param_relu,time_start_relu,time_stop,end_relu=500)
     Strain_end_infty = tau0/param2[0]
     relative_error = np.abs(Strain_end_infty-Strain)/Strain_end_infty*100
     Strain_end_estimation = Strain[np.where(Strain>=kv(Xp,*param2)[-1])[0][0]]
-    print('\n Strain at the end : %s'%Strain_end_estimation)
-    print('\n Error the strain made : %s %%'%(np.abs(Strain_end_infty-Strain_end_estimation)/Strain_end_infty*100))
+    # print('\n Strain at the end : %s'%Strain_end_estimation)
+    # print('\n Error the strain made : %s %%'%(np.abs(Strain_end_infty-Strain_end_estimation)/Strain_end_infty*100))
+    print('\n Strain at the end : %s'%np.mean(Strain[time_stop-500:time_stop]))
     
+    plt.figure()
+    plt.hist(normal_force[700:],bins=100,label=r'Hist. of $F_{\mathrm{N}}$')
+    hist,bins = np.histogram(normal_force[700:],bins=100)
+    param_gaussian,cov_gaussian = curve_fit(gaussian_function,bins[1:],hist,
+                                            p0 = (100,10),
+                                            maxfev = 10000) 
+    fit_gaussian = gaussian_function(bins,*param_gaussian) 
+    plt.plot(bins,fit_gaussian*np.max(hist)/np.max(fit_gaussian),c='black',ls='--',
+              label=r'Gaussian fit, $\sigma = %s\,\mathrm{mN}$'%(round(param_gaussian[0]*1e3,2)))
+    plt.axvline(x=param_gaussian[1],
+                label=r'Mean value, $\mu=%s\,\mathrm{mN}$'%round(param_gaussian[1]*1e3,2),
+                ls='--',c='red')
+    plt.legend()
+    plt.xlabel('Normal force, $F_{\mathrm{N}}$ (N)')
+    plt.ylabel('\# of points')
+    plt.grid()
+    
+    plt.figure()
+    Noise = Strain[time_goal:] - kv(Time[time_goal:],*param2)
+    plt.hist(Noise,bins=100,label=r'Hist. of $\gamma$, $\sigma = %s$'%(round(np.std(Noise,ddof=1),3)))
+    hist,bins = np.histogram(Noise,bins=100)
+    param_gaussian,cov_gaussian = curve_fit(gaussian_function,bins[1:],hist,
+                                            p0 = (100,10),
+                                            maxfev = 10000) 
+    fit_gaussian = gaussian_function(bins,*param_gaussian) 
+    # plt.plot(bins,fit_gaussian*np.max(hist)/np.max(fit_gaussian),c='black',ls='--',
+    #           label=r'Gaussian fit, $\sigma = %s$'%(round(param_gaussian[0]*1e3,2)))
+    # plt.axvline(x=param_gaussian[1],
+    #             label=r'Mean value, $\mu=%s$'%round(param_gaussian[1]*1e3,2),
+    #             ls='--',c='red')
+    plt.legend()
+    plt.xlabel('Strain, $\gamma$')
+    plt.ylabel('\# of points')
+    plt.grid()
+    plt.tight_layout()
+    print('\n Error on strain : %s'%(np.std(Strain[time_goal:time_stop],ddof=1)))
+    print('\n Normal Force applied : %s'%(np.mean(normal_force[time_start_relu+time_goal:])))
+    print('\n Error Normal Force applied : %s'%(np.std(normal_force[time_start_relu+time_goal:],ddof=1)))
