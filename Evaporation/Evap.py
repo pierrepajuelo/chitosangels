@@ -3,18 +3,40 @@
 Created on Fri Jun  9 10:28:25 2023
 
 @author: Pierre PAJUELO
+@subject: Data and analysis of evaporation results on chitosan gels
+@version: 01/08/23 (Last Version)
 """
 # Importation des modules
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from datetime import datetime
-from scipy.optimize import curve_fit
+
 # Définition des fonctions
 def incert(sech,sigma_sec,dry,sigm_dry,total):
+    """
+    Returns the uncertainty of the ratio according the other uncertainties
+
+    Parameters
+    ----------
+    sech : array or float
+        Numerator of the ratio.
+    sigma_sec : array or float
+        Uncertainty of the numerator.
+    dry : array or float
+        Denominator of the ratio.
+    sigm_dry : array or float
+        Uncertainty of the denominator.
+    total : array or float
+        Value of the ratio.
+
+    Returns
+    -------
+    Uncertainty of the ratio.
+
+    """
     return(total*np.sqrt((sigma_sec/sech)**2+(sigm_dry/dry)**2))
-def inverse(percentage,a,b):
-    return(a*(1/percentage+b))
+
 # Programme principal
 if __name__=='__main__':
     # FIGURES OPTIONS
@@ -72,7 +94,7 @@ if __name__=='__main__':
     sigma_sech = 0.01
     sigma_pertes = 0.001
     
-    # CALCUL
+    # CALCULUS
     recovery_ratio = recov/dry
     recovery_err = incert(recov,sigma_sech,dry,sigma_pertes,recovery_ratio)
     initial_mass_ratio = recov/init
@@ -100,6 +122,7 @@ if __name__=='__main__':
     initial_mass_ratio4 = recov4/init4
     initial_mass_err4 = incert(recov4,sigma_sech,init4,sigma_sech,initial_mass_ratio4)
     percent_err4 = incert(dry4,sigma_pertes,init4,sigma_sech,percentage4)
+    
     # PLOT
     plt.close('all')
     fig = plt.figure(figsize=(13,8))
@@ -114,7 +137,6 @@ if __name__=='__main__':
                 marker='o',ms=5,c='gold',capsize=3,label='W10',ecolor='navy')
     ax.set_xlabel('Percentage of initial mass, $m_{\mathrm{dry}}/m_{\mathrm{init.}}$')
     ax.set_ylabel(r'Recovery ratio, $m_{\mathrm{recov.}}/m_{\mathrm{dry}}$')
-    # param,cov = curve_fit(inverse,percentage,recovery_ratio,p0=())
     percentage_list = np.linspace(1e-10,1,100)
     ax.plot(percentage_list,1/percentage_list,c='black',ls='--',label='Theoritical, perfect recovery')
     ax.yaxis.label.set_color('red') 
@@ -160,7 +182,7 @@ if __name__=='__main__':
     sigma_sech = 0.01
     sigma_pertes = 0.01
     
-    # CALCUL
+    # CALCULUS
     percentage_evap = np.hstack([np.array([[0.37],[0.14]])]*N_times)
     recovery_ratio_evap = recov_evap/dry_evap
     recovery_err_evap = incert(dry_evap,sigma_sech,dry_evap,sigma_pertes,recovery_ratio_evap)
@@ -190,8 +212,8 @@ if __name__=='__main__':
     # plt.savefig('D:/Downloads/Evaporation_results.png', transparent = True)
     
     plt.figure()
-    # TIME SCALE
     
+    # TIME SCALE
     begin = datetime(2023,6,7,14,27)
     first_meas = datetime(2023,6,9,17)
     second_meas = datetime(2023,6,12,11,20)

@@ -10,20 +10,36 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 from scipy.optimize import curve_fit
-
+import matplotlib as mpl
 # Definition of functions
 def line(t,a):
     return(t*a)
 # Principal program
 if __name__=='__main__':
-    folder = 'D:/Documents/GitHub/chitosangels/Figures_Final'
-    data = pd.read_csv(folder+'/RESULTS.txt',
+    ### PLOT
+    plt.rc('text', usetex=True)
+    plt.rc('text.latex', preamble=r'\usepackage{amsmath} \usepackage{lmodern} \usepackage{bm} \usepackage{xcolor}')
+    #Options
+    params = {'text.usetex' : True,
+              'font.size' : 18,
+              'font.family' : 'lmodern',
+              }    
+    plt.rcParams.update(params)
+    mpl.rcParams['axes.linewidth'] = 1.
+    
+    folder = 'C:/Users/pierr/Documents/GitHub/chitosangels/Figures_Final'
+    data = pd.read_csv(folder+'/RESULTS_FINAL.txt',
                        sep='-', lineterminator='\r',encoding = "utf-8",header=None,
                        low_memory=False)
     diameter = 1.5e-3
-    stress = data.iloc[:,3].to_numpy(dtype=float)*1e-3/(np.pi*(diameter/2)**2)
-    strain = data.iloc[:,1].to_numpy(dtype=float)
-    errbars = data.iloc[:,2].to_numpy(dtype=float)/100
+    stress = data.iloc[:-1,3].to_numpy(dtype=float)/(np.pi*(diameter/2)**2)
+    strain = data.iloc[:-1,1].to_numpy(dtype=float)
+    errbars = data.iloc[:-1,2].to_numpy(dtype=float)
+    stress_err = data.iloc[:-1,4].to_numpy(dtype=float)/(np.pi*(diameter/2)**2)
+    stressdma = data.iloc[-1,3]/(np.pi*(diameter/2)**2)
+    straindma = data.iloc[-1,1]
+    errbarsdma = data.iloc[-1,2]
+    stress_errdma = data.iloc[-1,4]/(np.pi*(diameter/2)**2)
     
     modulusw9asph = 13.235997866493843e3 # in Pa
     stdmodulusw9asph = 3.1641026956818994e3
@@ -41,13 +57,18 @@ if __name__=='__main__':
     # errbars = np.array([3.86,1.21,1.49,1.83])/100
     # stress  = np.array([6.9,19.9,19.99,20.06])
     # folder = 'D:/Documents/GitHub/chitosangels/Figures'
-    param,cov = curve_fit(line,strain[strain<0.2],stress[strain<0.2],p0=(10e3),maxfev=10000)
+    straintot = data.iloc[:,1].to_numpy(dtype=float)
+    stresstot = data.iloc[:,3].to_numpy(dtype=float)/(np.pi*(diameter/2)**2)
+    param,cov = curve_fit(line,straintot[straintot<0.15],stresstot[straintot<0.15],p0=(10e3),maxfev=10000)
     # PLOT
     plt.close('all')
-    plt.figure(figsize=(10,5))
-    plt.errorbar(strain,stress,c='blue',marker='o',xerr=errbars,yerr=0.3e-3/(np.pi*(diameter/2)**2)*np.ones(strain.shape[0]),lw=1,ls='None',ms=5,capsize=3)
+    plt.figure(figsize=(14,7))
+    plt.errorbar(strain,stress,c='blue',marker='o',xerr=errbars,yerr=stress_err,lw=1,ls='None',ms=5,capsize=3,
+                 label='MCR Data')
+    plt.errorbar(straindma,stressdma,c='red',marker='o',xerr=errbarsdma,yerr=stress_errdma,lw=1,ls='None',ms=5,capsize=3,
+                 label='DMA Data')
     plt.plot(np.linspace(0,0.6,100),line(np.linspace(0,0.6,100),*param),ls='--',
-             label=r'Linear fit for $\gamma <0.2$, $E = %s$ kPa'%round(param[0]/1e3,3),
+             label=r'Linear fit for $\gamma <0.15$, $E = %s$ kPa'%round(param[0]/1e3,3),
              alpha = 0.5)
     end = 0.2
     plt.fill_between(np.linspace(0,end,100),line(np.linspace(0,end,100),E1),
@@ -65,10 +86,10 @@ if __name__=='__main__':
     plt.xlabel(r'Strain, $\gamma$')
     plt.ylabel(r'Stress, $\sigma$ (Pa)')
     plt.grid()
-    plt.axhline(y=5*1e-3/(np.pi*(diameter/2)**2),c='navy',label='Technical limit, 5 mN')
-    plt.axhline(y=2*1e-3/(np.pi*(diameter/2)**2),c='red',label='Noise limit, 2 mN')
+    plt.axhline(y=5*1e-3/(np.pi*(diameter/2)**2),c='navy',label='Technical limit MCR 302e, 5 mN')
+    plt.axhline(y=2*1e-3/(np.pi*(diameter/2)**2),c='red',label='Noise limit MCR 302e, 2 mN',alpha=0.2)
     plt.axhline(y=0.1
                 *1e-3/(np.pi*(diameter/2)**2),c='green',label='Technical limit DMA Q800, 0.1 mN')
-    plt.legend(loc=1)
+    plt.legend(loc=1,fontsize=15)
     # plt.savefig(folder+'/'+'Result_elastic_modulus.png')
     
