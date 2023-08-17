@@ -67,14 +67,48 @@ def data_format_bis(data):
     normal_force = data.iloc[:,3].to_numpy(dtype=float)
     return(time,gap,normal_force)
 
+
+
 def analysis(time,gap,normal_force,
-             end_time_relu=500,
              linear_beginning=0.1067,
              linear_end=0.1287,
              optim_evap_torque=False,
              optim_value=-1,
-             relu_end = 1000,
-             fraction_time=2):
+             relu_end = 500,
+             fraction_time=2,
+             stepsearch=50):
+    """
+    
+    FINAL FUNCTION FOR ANALYSIS
+
+    Parameters
+    ----------
+    time : array
+        Time array.
+    gap : array
+        Gap array.
+    normal_force : array
+        Gap array.
+    linear_beginning : float, optional
+        Helps the fit of KV, refere to the begginning of the linear part. The default is 0.1067.
+    linear_end : float, optional
+        Helps the fit of KV, refere to the end of the linear part. The default is 0.1287.
+    optim_evap_torque : bool, optional
+        Bool to activate the search of optimum value for the end part. The default is False.
+    optim_value : int, optional
+        Index of the end of the fitting data, set the value only if the previous parameter is False. The default is -1.
+    relu_end : int, optional
+        Index of time for the end of the fit of ReLU function. The default is 500.
+    fraction_time : float, optional
+        Stop of the search for optimal stop, set as Time/fraction_time and continues towards the end. The default is 2.
+    stepsearch : int, optional
+        Step for the interval of search, depending on the amount of data you should set it big. The default is 50.
+
+    Returns
+    -------
+    Bunch of parameters.
+
+    """
     time_start = np.where(normal_force>=0.0025)[0][0]
     ## NEW WAY TO FIND THE BEGIN POINT OF EXPERIMENT
     param_relu,cov_relu = curve_fit(ReLU,time[:relu_end],normal_force[:relu_end],p0=(10,10,10),
@@ -104,7 +138,7 @@ def analysis(time,gap,normal_force,
         time_fit_first = np.where(Time>=Time[-1]/fraction_time)[0][0] # 207, 3000 # PREV 4037
         time_fit_end = np.where(Time>=Time[-1]*(9/10))[0][0] # 782, 6000 # PREV 6000
         endend = np.where(Time>=Time[-1]*(99/100))[0][0] # 7257 # PREV 7000
-        for end in tqdm(range(time_fit_first,time_fit_end,100)):
+        for end in tqdm(range(time_fit_first,time_fit_end,stepsearch)):
             X1 = Time[time_goal:end]
             Y1 = Strain[time_goal:end]
             X2 = Time[end:endend]
@@ -159,7 +193,7 @@ def plottingresult(Xl,param3,Xp,Yp,param2,Time,Strain,
     ax1.legend()
     ax1.set_xlabel('Time (s)')
     ax1.set_ylabel(r'Strain, $\gamma$')
-    ax1.set_title(r'Strain vs. Time for $F_{\mathrm{N}}=%s\,\mathrm{mN}$'%(round(np.mean(normal_force[300:])*1000,2)))
+    ax1.set_title(r'Strain vs. Time for $F_{\mathrm{N}}=%s\,\mathrm{mN}$'%(round(np.mean(normal_force[time_start_relu+time_goal:])*1e3,2)))#round(np.mean(normal_force[300:])*1000,2)))
     ax1.axvline(x=Time[time_goal],ls='--',lw=1,c='red')
     ax1.axvline(x=Time[time_stop],ls='--',lw=1,c='blue')
     left, bottom, width, height = [0.3, 0.4, 0.5, 0.2]
@@ -183,6 +217,7 @@ def plottingresult(Xl,param3,Xp,Yp,param2,Time,Strain,
     # PLOT OF RAW DATA
     # plt.figure('Raw Data')
     fig, ax = plt.subplots()
+    fig.set_size_inches([11,9])
     ax.plot(time,normal_force,c='red')
     ax.set_xlabel('Time (sec.)')
     ax.set_ylabel(r'Normal force $F_{\mathrm{N}}$ (N)')
@@ -211,6 +246,7 @@ def plottingresult(Xl,param3,Xp,Yp,param2,Time,Strain,
     ax3.set_ylim((-0.001,0.006))
     ax3.grid(ls='-')
     ax3.set_title('Inset of First Region')
+    plt.tight_layout()
 # Functions for fitting
 def gaussian(t,tau,a):
     return(a*(np.exp(-(t-t[0])/tau)+1))
@@ -229,9 +265,92 @@ def springpot(t,alpha,lambda1):
     return(J)
 def cauchy(x,a,b,c):
     return(a/(np.pi*(1+b*x**2))+c)
-#%%
+
 # Principal program
 if __name__=='__main__':
+    
+    ### Update of the program
+    # General informations
+    # folder = "C:/Users/afn/Documents/FractureDynamics/Reometer_Data" 
+    # folder = 'D:/Documents/GitHub/chitosangels/Rheometer_Modifications'
+    folder = 'C:/Users/pierr/Documents/GitHub/chitosangels/Rheometer_Modifications'
+    
+    ###
+    # result_rheometer = [f for f in os.listdir(folder) if f.endswith("30_2023 10_07 AM.csv")][0]
+    
+    ### In the following, we'll analyze only the 1.5mm diameter gels :
+    Gel_diameter = 1.5e-3/2 # in m
+    ###
+    result_rheometer = [f for f in os.listdir(folder) if f.endswith("6_2023 1_45 PM.csv")][0]
+    data = pd.read_csv(folder+'/'+result_rheometer,
+                       skiprows=9,
+                       sep='\t', lineterminator='\r',encoding = "utf-16",
+                       low_memory=False).drop(columns='\n')
+    time,gap,normal_force = data_format_bis(data)
+    
+    Normal_force_instruction = round(np.mean(normal_force[700:]),6)
+    
+    tau0 = Normal_force_instruction/(np.pi*(Gel_diameter)**2) 
+    time_goal,Xl,Yl,param3,Xp,Yp,param2,cov2,Strain,Time,param_relu,time_start_relu,time_stop = analysis(time,
+                                                                    gap,
+                                                                    normal_force,optim_evap_torque=True,
+                                                                    # optim_value = 31468,
+                                                                    linear_beginning=0.13,
+                                                                    linear_end=0.15,
+                                                                    relu_end=500, #500
+                                                                    fraction_time=4) # 1.25
+    plottingresult(Xl,param3,Xp,Yp,param2,Time,Strain,
+                       time,normal_force,gap,
+                       time_goal,param_relu,time_start_relu,time_stop,end_relu=1500)
+    Strain_end_infty = tau0/param2[0]
+    relative_error = np.abs(Strain_end_infty-Strain)/Strain_end_infty*100
+    Strain_end_estimation = Strain[np.where(Strain>=kv(Xp,*param2)[-1])[0][0]]
+    # print('\n Strain at the end : %s'%Strain_end_estimation)
+    # print('\n Error the strain made : %s %%'%(np.abs(Strain_end_infty-Strain_end_estimation)/Strain_end_infty*100))
+    print('\n Strain at the end : %s'%np.mean(Strain[time_stop-500:time_stop]))
+    
+    plt.figure()
+    plt.hist(normal_force[700:],bins=100,label=r'Hist. of $F_{\mathrm{N}}$')
+    hist,bins = np.histogram(normal_force[700:],bins=100)
+    param_gaussian,cov_gaussian = curve_fit(gaussian_function,bins[1:],hist,
+                                            p0 = (100,10),
+                                            maxfev = 10000) 
+    fit_gaussian = gaussian_function(bins,*param_gaussian) 
+    plt.plot(bins,fit_gaussian*np.max(hist)/np.max(fit_gaussian),c='black',ls='--',
+              label=r'Gaussian fit, $\sigma = %s\,\mathrm{mN}$'%(round(param_gaussian[0]*1e3,2)))
+    plt.axvline(x=param_gaussian[1],
+                label=r'Mean value, $\mu=%s\,\mathrm{mN}$'%round(param_gaussian[1]*1e3,2),
+                ls='--',c='red')
+    plt.legend()
+    plt.xlabel('Normal force, $F_{\mathrm{N}}$ (N)')
+    plt.ylabel('\# of points')
+    plt.grid()
+    
+    plt.figure()
+    Noise = Strain[time_goal:] - kv(Time[time_goal:],*param2)
+    plt.hist(Noise,bins=100,label=r'Hist. of $\gamma$, $\sigma = %s$'%(round(np.std(Noise,ddof=1),3)))
+    hist,bins = np.histogram(Noise,bins=100)
+    param_gaussian,cov_gaussian = curve_fit(gaussian_function,bins[1:],hist,
+                                            p0 = (100,10),
+                                            maxfev = 10000) 
+    fit_gaussian = gaussian_function(bins,*param_gaussian) 
+    # plt.plot(bins,fit_gaussian*np.max(hist)/np.max(fit_gaussian),c='black',ls='--',
+    #           label=r'Gaussian fit, $\sigma = %s$'%(round(param_gaussian[0]*1e3,2)))
+    # plt.axvline(x=param_gaussian[1],
+    #             label=r'Mean value, $\mu=%s$'%round(param_gaussian[1]*1e3,2),
+    #             ls='--',c='red')
+    plt.legend()
+    plt.xlabel('Strain, $\gamma$')
+    plt.ylabel('\# of points')
+    plt.grid()
+    plt.tight_layout()
+    print('\n Error on strain : %s'%(np.std(Strain[time_goal:time_stop],ddof=1)))
+    print('\n Normal Force applied : %s'%(np.mean(normal_force[time_start_relu+time_goal:])))
+    print('\n Error Normal Force applied : %s'%(np.std(normal_force[time_start_relu+time_goal:],ddof=1)))
+    
+    
+    
+    #%% TRASH (in case you need some of the previous codes)
     # Import the data
     # folder = 'D:/STAGE M1/CHITOSAN/NORMALFORCE'
     # folder = 'D:/Documents/GitHub/chitosangels/Data'
@@ -485,77 +604,3 @@ if __name__=='__main__':
     # plt.ylabel(r'$\#$ of points')
     # plt.title('Histogram for %s mN'%(Normal_force_instruction*1e3))
     ###
-    #%% Update of the program
-    # General informations
-    # folder = "C:/Users/afn/Documents/FractureDynamics/Reometer_Data" 
-    folder = 'D:/Documents/GitHub/chitosangels/Rheometer_Modifications'
-    ###
-    # result_rheometer = [f for f in os.listdir(folder) if f.endswith("30_2023 10_07 AM.csv")][0]
-    
-    ### In the following, we'll analyze only the 1.5mm diameter gels :
-    Gel_diameter = 1.5e-3/2 # in m
-    ###
-    result_rheometer = [f for f in os.listdir(folder) if f.endswith("30_2023 5_11 PM.csv")][0]
-    data = pd.read_csv(folder+'/'+result_rheometer,skiprows=9,
-                       sep='\t', lineterminator='\r',encoding = "utf-16",
-                       low_memory=False).drop(columns='\n')
-    time,gap,normal_force = data_format_bis(data)
-    Normal_force_instruction = round(np.mean(normal_force[700:]),6)
-    
-    tau0 = Normal_force_instruction/(np.pi*(Gel_diameter)**2) 
-    time_goal,Xl,Yl,param3,Xp,Yp,param2,cov2,Strain,Time,param_relu,time_start_relu,time_stop = analysis(time,
-                                                                    gap,
-                                                                    normal_force,optim_evap_torque=True,
-                                                                    # optim_value = 31468,
-                                                                    linear_beginning=0.14,
-                                                                    linear_end=0.160,
-                                                                    relu_end=500,
-                                                                    fraction_time=1.5)
-    plottingresult(Xl,param3,Xp,Yp,param2,Time,Strain,
-                       time,normal_force,gap,
-                       time_goal,param_relu,time_start_relu,time_stop,end_relu=500)
-    Strain_end_infty = tau0/param2[0]
-    relative_error = np.abs(Strain_end_infty-Strain)/Strain_end_infty*100
-    Strain_end_estimation = Strain[np.where(Strain>=kv(Xp,*param2)[-1])[0][0]]
-    # print('\n Strain at the end : %s'%Strain_end_estimation)
-    # print('\n Error the strain made : %s %%'%(np.abs(Strain_end_infty-Strain_end_estimation)/Strain_end_infty*100))
-    print('\n Strain at the end : %s'%np.mean(Strain[time_stop-500:time_stop]))
-    
-    plt.figure()
-    plt.hist(normal_force[700:],bins=100,label=r'Hist. of $F_{\mathrm{N}}$')
-    hist,bins = np.histogram(normal_force[700:],bins=100)
-    param_gaussian,cov_gaussian = curve_fit(gaussian_function,bins[1:],hist,
-                                            p0 = (100,10),
-                                            maxfev = 10000) 
-    fit_gaussian = gaussian_function(bins,*param_gaussian) 
-    plt.plot(bins,fit_gaussian*np.max(hist)/np.max(fit_gaussian),c='black',ls='--',
-              label=r'Gaussian fit, $\sigma = %s\,\mathrm{mN}$'%(round(param_gaussian[0]*1e3,2)))
-    plt.axvline(x=param_gaussian[1],
-                label=r'Mean value, $\mu=%s\,\mathrm{mN}$'%round(param_gaussian[1]*1e3,2),
-                ls='--',c='red')
-    plt.legend()
-    plt.xlabel('Normal force, $F_{\mathrm{N}}$ (N)')
-    plt.ylabel('\# of points')
-    plt.grid()
-    
-    plt.figure()
-    Noise = Strain[time_goal:] - kv(Time[time_goal:],*param2)
-    plt.hist(Noise,bins=100,label=r'Hist. of $\gamma$, $\sigma = %s$'%(round(np.std(Noise,ddof=1),3)))
-    hist,bins = np.histogram(Noise,bins=100)
-    param_gaussian,cov_gaussian = curve_fit(gaussian_function,bins[1:],hist,
-                                            p0 = (100,10),
-                                            maxfev = 10000) 
-    fit_gaussian = gaussian_function(bins,*param_gaussian) 
-    # plt.plot(bins,fit_gaussian*np.max(hist)/np.max(fit_gaussian),c='black',ls='--',
-    #           label=r'Gaussian fit, $\sigma = %s$'%(round(param_gaussian[0]*1e3,2)))
-    # plt.axvline(x=param_gaussian[1],
-    #             label=r'Mean value, $\mu=%s$'%round(param_gaussian[1]*1e3,2),
-    #             ls='--',c='red')
-    plt.legend()
-    plt.xlabel('Strain, $\gamma$')
-    plt.ylabel('\# of points')
-    plt.grid()
-    plt.tight_layout()
-    print('\n Error on strain : %s'%(np.std(Strain[time_goal:time_stop],ddof=1)))
-    print('\n Normal Force applied : %s'%(np.mean(normal_force[time_start_relu+time_goal:])))
-    print('\n Error Normal Force applied : %s'%(np.std(normal_force[time_start_relu+time_goal:],ddof=1)))
